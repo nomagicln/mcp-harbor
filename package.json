@@ -3,17 +3,20 @@
   "version": "1.0.0",
   "description": "A Node.js application for connecting to Harbor and providing operations capabilities.",
   "main": "src/app.ts",
+  "type": "module",
   "scripts": {
     "start": "ts-node src/app.ts",
     "test": "jest",
-    "build": "tsc && cp package.json dist/ && chmod +x dist/app.js"
+    "build": "tsc && cp package.json dist/ && chmod +x dist/app.js",
+    "test:connection": "ts-node tools/test-connection.ts"
   },
   "dependencies": {
     "@hapic/harbor": "^2.5.0",
     "@modelcontextprotocol/sdk": "^1.7.0",
     "axios": "^0.21.1",
     "dotenv": "^10.0.0",
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "hapic": "^2.5.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.13",
