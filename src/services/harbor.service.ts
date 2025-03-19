@@ -128,7 +128,9 @@ export class HarborService {
         message: `Tag ${tag} would be deleted (placeholder implementation)`,
       };
     } catch (error: any) {
-      throw new Error(`Failed to delete tag: ${error.message}`);
+      throw new Error(
+        "deleteTag method using @hapic/harbor needs further implementation"
+      );
     }
   }
 
@@ -214,7 +216,9 @@ export class HarborService {
         message: `Chart ${chartName} version ${version} would be deleted (placeholder implementation)`,
       };
     } catch (error: any) {
-      throw new Error(`Failed to delete chart: ${error.message}`);
+      throw new Error(
+        "deleteChart method using @hapic/harbor needs further implementation"
+      );
     }
   }
 }

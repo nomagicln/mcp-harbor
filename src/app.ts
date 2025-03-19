@@ -8,8 +8,11 @@ import {
   ErrorCode,
   CallToolRequest,
 } from "@modelcontextprotocol/sdk/types.js";
-import { HarborService, ProjectData } from "./services/harbor.service";
+import { HarborService, ProjectData } from "./services/harbor.service.js";
 import dotenv from "dotenv";
+
+// Disable TLS/SSL certificate validation
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 dotenv.config();
 
@@ -30,13 +33,149 @@ class HarborMcpServer {
       },
       {
         capabilities: {
-          tools: {},
+          tools: {
+            list_projects: {
+              description: "List all projects in Harbor",
+              inputSchema: {
+                type: "object",
+                properties: {},
+                required: [],
+              },
+            },
+            get_project: {
+              description: "Get project details by ID",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                },
+                required: ["projectId"],
+              },
+            },
+            create_project: {
+              description: "Create a new project in Harbor",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  project_name: { type: "string" },
+                  metadata: {
+                    type: "object",
+                    properties: {
+                      public: { type: "string" },
+                      enable_content_trust: { type: "string" },
+                      prevent_vul: { type: "string" },
+                      severity: { type: "string" },
+                      auto_scan: { type: "string" },
+                    },
+                  },
+                },
+                required: ["project_name"],
+              },
+            },
+            delete_project: {
+              description: "Delete a project by ID",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                },
+                required: ["projectId"],
+              },
+            },
+            list_repositories: {
+              description: "List all repositories in a project",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                },
+                required: ["projectId"],
+              },
+            },
+            delete_repository: {
+              description: "Delete a repository",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                  repositoryName: { type: "string" },
+                },
+                required: ["projectId", "repositoryName"],
+              },
+            },
+            list_tags: {
+              description: "List all tags in a repository",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                  repositoryName: { type: "string" },
+                },
+                required: ["projectId", "repositoryName"],
+              },
+            },
+            delete_tag: {
+              description: "Delete a tag from a repository",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                  repositoryName: { type: "string" },
+                  tag: { type: "string" },
+                },
+                required: ["projectId", "repositoryName", "tag"],
+              },
+            },
+            list_charts: {
+              description: "List all Helm charts in a project",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                },
+                required: ["projectId"],
+              },
+            },
+            list_chart_versions: {
+              description: "List all versions of a Helm chart",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                  chartName: { type: "string" },
+                },
+                required: ["projectId", "chartName"],
+              },
+            },
+            delete_chart: {
+              description: "Delete a specific version of a Helm chart",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  projectId: { type: "string" },
+                  chartName: { type: "string" },
+                  version: { type: "string" },
+                },
+                required: ["projectId", "chartName", "version"],
+              },
+            },
+          },
         },
       }
     );
 
     this.setupToolHandlers();
-    this.server.onerror = (error) => console.error("[MCP Error]", error);
+
+    // Enhanced error handling for debugging
+    this.server.onerror = (error) => {
+      console.error("[MCP Error]", error);
+      console.error("[MCP Error Stack]", error.stack);
+
+      // Log additional context if available
+      if (error.cause) {
+        console.error("[MCP Error Cause]", error.cause);
+      }
+    };
   }
 
   private setupToolHandlers() {
@@ -46,6 +185,11 @@ class HarborMcpServer {
         {
           name: "list_projects",
           description: "List all projects in Harbor",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
         },
         {
           name: "get_project",
@@ -424,9 +568,37 @@ class HarborMcpServer {
     if (!process.env.HARBOR_PASSWORD)
       throw new Error("HARBOR_PASSWORD environment variable is required");
 
+    console.error("[MCP Server] Starting Harbor MCP server...");
+
+    // Add debug logging for environment variables (without exposing sensitive data)
+    console.error("[MCP Server] Environment check:");
+    console.error(
+      `[MCP Server] - HARBOR_URL: ${process.env.HARBOR_URL ? "Set" : "Not set"}`
+    );
+    console.error(
+      `[MCP Server] - HARBOR_USERNAME: ${
+        process.env.HARBOR_USERNAME ? "Set" : "Not set"
+      }`
+    );
+    console.error(
+      `[MCP Server] - HARBOR_PASSWORD: ${
+        process.env.HARBOR_PASSWORD ? "Set" : "Not set"
+      }`
+    );
+    console.error(`[MCP Server] - DEBUG: ${process.env.DEBUG || "Not set"}`);
+
     const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.error("Harbor MCP server running on stdio");
+
+    // Connect to the transport
+    try {
+      await this.server.connect(transport);
+      console.error("[MCP Server] Successfully connected to transport");
+    } catch (err: any) {
+      console.error("[MCP Transport Error]", err);
+      throw err;
+    }
+
+    console.error("[MCP Server] Harbor MCP server running on stdio");
   }
 }
 
