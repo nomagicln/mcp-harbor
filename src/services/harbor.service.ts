@@ -32,7 +32,7 @@ export class HarborService {
     const response = await this.client.project.getMany({
       query: {},
     });
-    return response.data;
+    return response || [];
   }
 
   async getProject(projectId: string) {
@@ -66,7 +66,7 @@ export class HarborService {
       projectName: projectId,
       query: {},
     });
-    return response.data;
+    return response || [];
   }
 
   async deleteRepository(projectId: string, repositoryName: string) {
@@ -76,9 +76,6 @@ export class HarborService {
   }
 
   async getTags(projectId: string, repositoryName: string) {
-    // The @hapic/harbor package expects the full repository name in the format "project-name/repository-name"
-    const fullRepoName = `${projectId}/${repositoryName}`;
-
     // Get artifacts for the repository
     const artifacts = await this.client.projectRepositoryArtifact.getMany({
       projectName: projectId,
@@ -87,7 +84,7 @@ export class HarborService {
     });
 
     // Extract tag information from artifacts
-    return artifacts.map((artifact: any) => ({
+    return (artifacts || []).map((artifact: any) => ({
       name: artifact.digest,
       tags: artifact.tags || [],
       size: artifact.size,
@@ -97,9 +94,6 @@ export class HarborService {
   }
 
   async deleteTag(projectId: string, repositoryName: string, tag: string) {
-    // NOTE: The implementation of this method depends on the exact API of the @hapic/harbor package
-    // This is a placeholder implementation that should be updated when the API is better understood
-
     try {
       // Get artifacts for the repository
       const artifacts = await this.client.projectRepositoryArtifact.getMany({
@@ -109,43 +103,50 @@ export class HarborService {
       });
 
       // Find the artifact with the matching tag
-      const artifact = artifacts.find(
+      const artifact = (artifacts || []).find(
         (a: any) => a.tags && a.tags.includes(tag)
       );
       if (!artifact) {
         throw new Error(`Tag ${tag} not found in repository ${repositoryName}`);
       }
 
-      // Log information about what we would delete
-      console.log(
-        `Would delete tag ${tag} from repository ${repositoryName} with digest ${artifact.digest}`
-      );
+      // Delete the artifact using its tag or digest
+      await this.client.projectRepositoryArtifact.delete({
+        projectName: projectId,
+        repositoryName: repositoryName,
+        tagOrDigest: artifact.digest,
+      });
 
-      // Return a success message for now
-      // In a real implementation, this would actually delete the tag
       return {
         success: true,
-        message: `Tag ${tag} would be deleted (placeholder implementation)`,
+        message: `Tag ${tag} deleted successfully`,
       };
     } catch (error: any) {
-      throw new Error(
-        "deleteTag method using @hapic/harbor needs further implementation"
-      );
+      throw new Error(error.message || "Failed to delete tag");
     }
   }
 
   // Helm Chart operations
   async getCharts(projectId: string) {
-    // For Helm charts, we need to use a different approach
     // Get all repositories in the project
     const repositories = await this.client.projectRepository.getMany({
       projectName: projectId,
       query: {},
     });
 
+    // Handle repositories safely
+    let repoArray: any[] = [];
+    if (repositories && typeof repositories === "object") {
+      if (Array.isArray(repositories)) {
+        repoArray = repositories;
+      } else if ("data" in repositories) {
+        repoArray = (repositories as any).data || [];
+      }
+    }
+
     // Filter for chart repositories
-    const chartRepos = repositories.data.filter((repo: any) =>
-      repo.name.includes("/charts/")
+    const chartRepos = repoArray.filter(
+      (repo) => repo.name && repo.name.includes("/charts/")
     );
 
     // Map to the expected format
@@ -159,9 +160,6 @@ export class HarborService {
   }
 
   async getChartVersions(projectId: string, chartName: string) {
-    // For chart versions, we need to get artifacts from the chart repository
-    const repoName = `${projectId}/charts/${chartName}`;
-
     try {
       const artifacts = await this.client.projectRepositoryArtifact.getMany({
         projectName: projectId,
@@ -169,22 +167,18 @@ export class HarborService {
         query: {},
       });
 
-      return artifacts.map((artifact: any) => ({
+      return (artifacts || []).map((artifact: any) => ({
         name: artifact.digest,
         version: artifact.tags?.[0] || "",
         created: artifact.push_time,
         updated: artifact.update_time,
       }));
     } catch (error) {
-      // If the repository doesn't exist, return an empty array
       return [];
     }
   }
 
   async deleteChart(projectId: string, chartName: string, version: string) {
-    // NOTE: The implementation of this method depends on the exact API of the @hapic/harbor package
-    // This is a placeholder implementation that should be updated when the API is better understood
-
     try {
       // Get artifacts for the chart repository
       const artifacts = await this.client.projectRepositoryArtifact.getMany({
@@ -194,7 +188,7 @@ export class HarborService {
       });
 
       // Find the artifact with the matching version tag
-      const artifact = artifacts.find(
+      const artifact = (artifacts || []).find(
         (a: any) => a.tags && a.tags.includes(version)
       );
 
@@ -204,21 +198,19 @@ export class HarborService {
         );
       }
 
-      // Log information about what we would delete
-      console.log(
-        `Would delete chart ${chartName} version ${version} with digest ${artifact.digest}`
-      );
+      // Delete the artifact using its tag or digest
+      await this.client.projectRepositoryArtifact.delete({
+        projectName: projectId,
+        repositoryName: `charts/${chartName}`,
+        tagOrDigest: artifact.digest,
+      });
 
-      // Return a success message for now
-      // In a real implementation, this would actually delete the chart version
       return {
         success: true,
-        message: `Chart ${chartName} version ${version} would be deleted (placeholder implementation)`,
+        message: `Chart ${chartName} version ${version} deleted successfully`,
       };
     } catch (error: any) {
-      throw new Error(
-        "deleteChart method using @hapic/harbor needs further implementation"
-      );
+      throw new Error(error.message || "Failed to delete chart version");
     }
   }
 }

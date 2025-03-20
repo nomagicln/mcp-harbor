@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { HarborController } from "../controllers/harbor.controller";
+import { HarborController } from "../controllers/harbor.controller.js";
 
 const router = Router();
 const harborController = new HarborController();

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { HarborService } from "../services/harbor.service";
+import { HarborService } from "../services/harbor.service.js";
 import dotenv from "dotenv";
 
 dotenv.config();

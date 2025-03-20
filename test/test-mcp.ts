@@ -11,15 +11,20 @@
  */
 
 import { spawn } from "child_process";
-import * as path from "path";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import * as fs from "fs";
+import dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config();
 
 // Set up environment variables for the MCP server
 const env = {
   ...process.env,
-  HARBOR_URL: "your_harbor_url",
-  HARBOR_USERNAME: "your_username",
-  HARBOR_PASSWORD: "your_password",
+  HARBOR_URL: process.env.HARBOR_URL || "",
+  HARBOR_USERNAME: process.env.HARBOR_USERNAME || "",
+  HARBOR_PASSWORD: process.env.HARBOR_PASSWORD || "",
   // Enable debug logging for MCP
   DEBUG: "mcp:*",
 };
@@ -28,8 +33,23 @@ const env = {
 function runMcpServer() {
   console.log("Starting MCP Harbor server in debug mode...");
 
+  // Verify required environment variables
+  if (!env.HARBOR_URL || !env.HARBOR_USERNAME || !env.HARBOR_PASSWORD) {
+    console.error(
+      "Error: Missing required environment variables. Please check your .env file."
+    );
+    console.error(
+      "Required variables: HARBOR_URL, HARBOR_USERNAME, HARBOR_PASSWORD"
+    );
+    process.exit(1);
+  }
+
+  // Get the directory name in ESM
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+
   // Path to the built app.js file
-  const appPath = path.resolve(__dirname, "../src/app.ts");
+  const appPath = join(__dirname, "../dist/app.js");
 
   // Check if the file exists
   if (!fs.existsSync(appPath)) {
@@ -40,7 +60,7 @@ function runMcpServer() {
   }
 
   // Spawn the MCP server process
-  const serverProcess = spawn("ts-node", [appPath], {
+  const serverProcess = spawn("node", [appPath], {
     env,
     stdio: ["pipe", "pipe", "pipe"],
   });

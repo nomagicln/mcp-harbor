@@ -9,12 +9,12 @@ import {
   CallToolRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { HarborService, ProjectData } from "./services/harbor.service.js";
-import dotenv from "dotenv";
+import { config } from "dotenv";
 
 // Disable TLS/SSL certificate validation
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-dotenv.config();
+config();
 
 // Initialize the Harbor service using the @hapic/harbor package
 const harborService = new HarborService(process.env.HARBOR_URL || "", {
@@ -334,7 +334,14 @@ class HarborMcpServer {
             case "list_projects":
               return {
                 content: [
-                  { type: "json", json: await harborService.getProjects() },
+                  {
+                    type: "text",
+                    text: JSON.stringify(
+                      await harborService.getProjects(),
+                      null,
+                      2
+                    ),
+                  },
                 ],
               };
 
@@ -348,8 +355,12 @@ class HarborMcpServer {
               return {
                 content: [
                   {
-                    type: "json",
-                    json: await harborService.getProject(projectId),
+                    type: "text",
+                    text: JSON.stringify(
+                      await harborService.getProject(projectId),
+                      null,
+                      2
+                    ),
                   },
                 ],
               };
@@ -365,8 +376,12 @@ class HarborMcpServer {
               return {
                 content: [
                   {
-                    type: "json",
-                    json: await harborService.createProject(projectData),
+                    type: "text",
+                    text: JSON.stringify(
+                      await harborService.createProject(projectData),
+                      null,
+                      2
+                    ),
                   },
                 ],
               };
@@ -398,8 +413,12 @@ class HarborMcpServer {
               return {
                 content: [
                   {
-                    type: "json",
-                    json: await harborService.getRepositories(projectId),
+                    type: "text",
+                    text: JSON.stringify(
+                      await harborService.getRepositories(projectId),
+                      null,
+                      2
+                    ),
                   },
                 ],
               };
@@ -442,10 +461,11 @@ class HarborMcpServer {
               return {
                 content: [
                   {
-                    type: "json",
-                    json: await harborService.getTags(
-                      projectId,
-                      repositoryName
+                    type: "text",
+                    text: JSON.stringify(
+                      await harborService.getTags(projectId, repositoryName),
+                      null,
+                      2
                     ),
                   },
                 ],
@@ -485,8 +505,12 @@ class HarborMcpServer {
               return {
                 content: [
                   {
-                    type: "json",
-                    json: await harborService.getCharts(projectId),
+                    type: "text",
+                    text: JSON.stringify(
+                      await harborService.getCharts(projectId),
+                      null,
+                      2
+                    ),
                   },
                 ],
               };
@@ -508,10 +532,14 @@ class HarborMcpServer {
               return {
                 content: [
                   {
-                    type: "json",
-                    json: await harborService.getChartVersions(
-                      projectId,
-                      chartName
+                    type: "text",
+                    text: JSON.stringify(
+                      await harborService.getChartVersions(
+                        projectId,
+                        chartName
+                      ),
+                      null,
+                      2
                     ),
                   },
                 ],
