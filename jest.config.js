@@ -13,5 +13,8 @@ export default {
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
+    "^@modelcontextprotocol/sdk/(.*)$":
+      "<rootDir>/node_modules/@modelcontextprotocol/sdk/dist/esm/$1",
   },
+  testMatch: ["<rootDir>/test/**/*.test.ts"],
 };

@@ -1,13 +1,66 @@
 import { HarborClient } from "@hapic/harbor";
+import {
+  HarborArtifact,
+  HarborArtifactTag,
+  HarborChart,
+  HarborChartVersion,
+  HarborRepository,
+  ProjectData,
+  ResourceError,
+  ValidationError,
+  DeleteResponse,
+} from "../types/index.js";
 
-export interface ProjectData {
-  project_name: string;
-  metadata?: {
-    public?: string;
-    enable_content_trust?: string;
-    prevent_vul?: string;
-    severity?: string;
+// Internal type definitions to match Harbor API types
+interface BaseResource {
+  name: string;
+  creation_time?: string;
+  update_time?: string;
+}
+
+interface Project extends BaseResource {
+  project_id: number;
+  owner_id: number;
+  owner_name: string;
+  repo_count: number;
+  metadata: {
+    public: boolean;
     auto_scan?: string;
+    severity?: string;
+  };
+}
+
+interface Repository extends BaseResource {
+  artifact_count?: number;
+}
+
+interface ArtifactTag {
+  id: number;
+  name: string;
+  push_time: string;
+  pull_time: string;
+  immutable: boolean;
+  repository_id: number;
+  artifact_id: number;
+  signed: boolean;
+}
+
+interface Artifact {
+  digest: string;
+  tags?: ArtifactTag[];
+  size: number;
+  push_time: string;
+  pull_time: string;
+  type: string;
+  project_id: number;
+  repository_id: number;
+  id?: number;
+}
+
+interface ResourceCollection<T> {
+  data: T[];
+  meta?: {
+    total?: number;
   };
 }
 
@@ -15,6 +68,10 @@ export class HarborService {
   private client: HarborClient;
 
   constructor(apiUrl: string, auth: { username: string; password: string }) {
+    if (!apiUrl) throw new ValidationError("API URL is required");
+    if (!auth.username) throw new ValidationError("Username is required");
+    if (!auth.password) throw new ValidationError("Password is required");
+
     this.client = new HarborClient({
       request: {
         credentials: "include",
@@ -28,89 +85,198 @@ export class HarborService {
   }
 
   // Project operations
-  async getProjects() {
-    const response = await this.client.project.getMany({
-      query: {},
-    });
-    return response || [];
-  }
+  async getProjects(): Promise<HarborRepository[]> {
+    try {
+      const response = (await this.client.project.getMany({
+        query: {},
+      })) as ResourceCollection<Project>;
 
-  async getProject(projectId: string) {
-    // Check if projectId is a number
-    if (!isNaN(Number(projectId))) {
-      return this.client.project.getOne(Number(projectId));
+      return (response?.data || []).map((project) => ({
+        name: project.name,
+        project_id: project.project_id,
+        creation_time: project.creation_time,
+        update_time: project.update_time,
+      }));
+    } catch (error: unknown) {
+      throw this.handleError(error, "Failed to get projects");
     }
-    // Otherwise, assume it's a name
-    return this.client.project.getOne(projectId, true);
   }
 
-  async createProject(projectData: ProjectData) {
-    return this.client.project.create({
-      project_name: projectData.project_name,
-      ...(projectData.metadata && { metadata: projectData.metadata }),
-    });
-  }
+  async getProject(projectId: string): Promise<HarborRepository> {
+    try {
+      if (!projectId) throw new ValidationError("Project ID is required");
 
-  async deleteProject(projectId: string) {
-    // Check if projectId is a number
-    if (!isNaN(Number(projectId))) {
-      return this.client.project.delete(Number(projectId));
+      const response = !isNaN(Number(projectId))
+        ? ((await this.client.project.getOne(Number(projectId))) as Project)
+        : ((await this.client.project.getOne(projectId, true)) as Project);
+
+      if (!response) {
+        throw new ResourceError(`Project ${projectId} not found`);
+      }
+
+      return {
+        name: response.name,
+        project_id: response.project_id,
+        creation_time: response.creation_time,
+        update_time: response.update_time,
+      };
+    } catch (error: unknown) {
+      throw this.handleError(error, `Failed to get project ${projectId}`);
     }
-    // Otherwise, assume it's a name
-    return this.client.project.delete(projectId, true);
+  }
+
+  async createProject(projectData: ProjectData): Promise<HarborRepository> {
+    try {
+      if (!projectData.project_name) {
+        throw new ValidationError("Project name is required");
+      }
+
+      const response = await this.client.project.create({
+        project_name: projectData.project_name,
+        ...(projectData.metadata && { metadata: projectData.metadata }),
+      });
+
+      // Since create only returns ID, fetch the full project details
+      if (response.id) {
+        return this.getProject(response.id.toString());
+      }
+      throw new Error("Failed to create project: No project ID returned");
+    } catch (error: unknown) {
+      throw this.handleError(error, "Failed to create project");
+    }
+  }
+
+  async deleteProject(projectId: string): Promise<void> {
+    try {
+      if (!projectId) throw new ValidationError("Project ID is required");
+
+      if (!isNaN(Number(projectId))) {
+        await this.client.project.delete(Number(projectId));
+      } else {
+        await this.client.project.delete(projectId, true);
+      }
+    } catch (error: unknown) {
+      throw this.handleError(error, `Failed to delete project ${projectId}`);
+    }
   }
 
   // Repository/Image operations
-  async getRepositories(projectId: string) {
-    const response = await this.client.projectRepository.getMany({
-      projectName: projectId,
-      query: {},
-    });
-    return response || [];
-  }
-
-  async deleteRepository(projectId: string, repositoryName: string) {
-    // The @hapic/harbor package expects the full repository name in the format "project-name/repository-name"
-    const fullRepoName = `${projectId}/${repositoryName}`;
-    return this.client.projectRepository.delete(fullRepoName);
-  }
-
-  async getTags(projectId: string, repositoryName: string) {
-    // Get artifacts for the repository
-    const artifacts = await this.client.projectRepositoryArtifact.getMany({
-      projectName: projectId,
-      repositoryName: repositoryName,
-      query: {},
-    });
-
-    // Extract tag information from artifacts
-    return (artifacts || []).map((artifact: any) => ({
-      name: artifact.digest,
-      tags: artifact.tags || [],
-      size: artifact.size,
-      push_time: artifact.push_time,
-      pull_time: artifact.pull_time,
-    }));
-  }
-
-  async deleteTag(projectId: string, repositoryName: string, tag: string) {
+  async getRepositories(projectId: string): Promise<HarborRepository[]> {
     try {
-      // Get artifacts for the repository
+      if (!projectId) throw new ValidationError("Project ID is required");
+
+      const response = (await this.client.projectRepository.getMany({
+        projectName: projectId,
+        query: {},
+      })) as ResourceCollection<Repository>;
+
+      return (response?.data || []).map((repo) => ({
+        name: repo.name,
+        artifact_count: repo.artifact_count,
+        creation_time: repo.creation_time,
+        update_time: repo.update_time,
+      }));
+    } catch (error: unknown) {
+      throw this.handleError(
+        error,
+        `Failed to get repositories for project ${projectId}`
+      );
+    }
+  }
+
+  async deleteRepository(
+    projectId: string,
+    repositoryName: string
+  ): Promise<void> {
+    try {
+      if (!projectId) throw new ValidationError("Project ID is required");
+      if (!repositoryName)
+        throw new ValidationError("Repository name is required");
+
+      const fullRepoName = `${projectId}/${repositoryName}`;
+      await this.client.projectRepository.delete(fullRepoName);
+    } catch (error: unknown) {
+      throw this.handleError(
+        error,
+        `Failed to delete repository ${repositoryName}`
+      );
+    }
+  }
+
+  async getTags(
+    projectId: string,
+    repositoryName: string
+  ): Promise<HarborArtifact[]> {
+    try {
+      if (!projectId) throw new ValidationError("Project ID is required");
+      if (!repositoryName)
+        throw new ValidationError("Repository name is required");
+
       const artifacts = await this.client.projectRepositoryArtifact.getMany({
         projectName: projectId,
         repositoryName: repositoryName,
         query: {},
       });
 
-      // Find the artifact with the matching tag
-      const artifact = (artifacts || []).find(
-        (a: any) => a.tags && a.tags.includes(tag)
+      return (artifacts || []).map(
+        (artifact): HarborArtifact => ({
+          digest: artifact.digest,
+          tags: artifact.tags?.map(
+            (tag): HarborArtifactTag => ({
+              id: tag.id,
+              name: tag.name,
+              push_time: tag.push_time,
+              pull_time: tag.pull_time,
+              immutable: tag.immutable,
+              repository_id: tag.repository_id,
+              artifact_id: tag.artifact_id,
+              signed: tag.signed,
+            })
+          ),
+          size: artifact.size,
+          push_time: artifact.push_time,
+          pull_time: artifact.pull_time,
+          type: artifact.type,
+          project_id: artifact.project_id,
+          repository_id: artifact.repository_id,
+          id: artifact.id,
+        })
       );
+    } catch (error: unknown) {
+      throw this.handleError(
+        error,
+        `Failed to get tags for repository ${repositoryName}`
+      );
+    }
+  }
+
+  async deleteTag(
+    projectId: string,
+    repositoryName: string,
+    tagName: string
+  ): Promise<DeleteResponse> {
+    try {
+      if (!projectId) throw new ValidationError("Project ID is required");
+      if (!repositoryName)
+        throw new ValidationError("Repository name is required");
+      if (!tagName) throw new ValidationError("Tag name is required");
+
+      const artifacts = await this.client.projectRepositoryArtifact.getMany({
+        projectName: projectId,
+        repositoryName: repositoryName,
+        query: {},
+      });
+
+      const artifact = (artifacts || []).find((a) =>
+        a.tags?.some((tag) => tag.name === tagName)
+      );
+
       if (!artifact) {
-        throw new Error(`Tag ${tag} not found in repository ${repositoryName}`);
+        throw new ResourceError(
+          `Tag ${tagName} not found in repository ${repositoryName}`
+        );
       }
 
-      // Delete the artifact using its tag or digest
       await this.client.projectRepositoryArtifact.delete({
         projectName: projectId,
         repositoryName: repositoryName,
@@ -119,86 +285,96 @@ export class HarborService {
 
       return {
         success: true,
-        message: `Tag ${tag} deleted successfully`,
+        message: `Tag ${tagName} deleted successfully`,
       };
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to delete tag");
+    } catch (error: unknown) {
+      throw this.handleError(error, `Failed to delete tag ${tagName}`);
     }
   }
 
   // Helm Chart operations
-  async getCharts(projectId: string) {
-    // Get all repositories in the project
-    const repositories = await this.client.projectRepository.getMany({
-      projectName: projectId,
-      query: {},
-    });
-
-    // Handle repositories safely
-    let repoArray: any[] = [];
-    if (repositories && typeof repositories === "object") {
-      if (Array.isArray(repositories)) {
-        repoArray = repositories;
-      } else if ("data" in repositories) {
-        repoArray = (repositories as any).data || [];
-      }
-    }
-
-    // Filter for chart repositories
-    const chartRepos = repoArray.filter(
-      (repo) => repo.name && repo.name.includes("/charts/")
-    );
-
-    // Map to the expected format
-    return chartRepos.map((repo: any) => ({
-      name: repo.name.split("/").pop(),
-      total_versions: repo.artifact_count || 0,
-      latest_version: "", // Would need additional API calls to get this
-      created: repo.creation_time,
-      updated: repo.update_time,
-    }));
-  }
-
-  async getChartVersions(projectId: string, chartName: string) {
+  async getCharts(projectId: string): Promise<HarborChart[]> {
     try {
-      const artifacts = await this.client.projectRepositoryArtifact.getMany({
-        projectName: projectId,
-        repositoryName: `charts/${chartName}`,
-        query: {},
-      });
+      if (!projectId) throw new ValidationError("Project ID is required");
 
-      return (artifacts || []).map((artifact: any) => ({
-        name: artifact.digest,
-        version: artifact.tags?.[0] || "",
-        created: artifact.push_time,
-        updated: artifact.update_time,
+      const response = (await this.client.projectRepository.getMany({
+        projectName: projectId,
+        query: {},
+      })) as ResourceCollection<Repository>;
+
+      const chartRepos = (response?.data || []).filter(
+        (repo) => repo.name && repo.name.includes("/charts/")
+      );
+
+      return chartRepos.map((repo) => ({
+        name: repo.name.split("/").pop() || "",
+        total_versions: repo.artifact_count || 0,
+        latest_version: "",
+        created: repo.creation_time || "",
+        updated: repo.update_time || "",
       }));
-    } catch (error) {
-      return [];
+    } catch (error: unknown) {
+      throw this.handleError(
+        error,
+        `Failed to get charts for project ${projectId}`
+      );
     }
   }
 
-  async deleteChart(projectId: string, chartName: string, version: string) {
+  async getChartVersions(
+    projectId: string,
+    chartName: string
+  ): Promise<HarborChartVersion[]> {
     try {
-      // Get artifacts for the chart repository
+      if (!projectId) throw new ValidationError("Project ID is required");
+      if (!chartName) throw new ValidationError("Chart name is required");
+
       const artifacts = await this.client.projectRepositoryArtifact.getMany({
         projectName: projectId,
         repositoryName: `charts/${chartName}`,
         query: {},
       });
 
-      // Find the artifact with the matching version tag
-      const artifact = (artifacts || []).find(
-        (a: any) => a.tags && a.tags.includes(version)
+      return (artifacts || []).map((artifact) => ({
+        name: artifact.digest,
+        version: artifact.tags?.[0]?.name || "",
+        created: artifact.push_time || "",
+        updated: artifact.push_time || "", // Using push_time as update_time is not available
+      }));
+    } catch (error: unknown) {
+      throw this.handleError(
+        error,
+        `Failed to get versions for chart ${chartName}`
+      );
+    }
+  }
+
+  async deleteChart(
+    projectId: string,
+    chartName: string,
+    version: string
+  ): Promise<DeleteResponse> {
+    try {
+      if (!projectId) throw new ValidationError("Project ID is required");
+      if (!chartName) throw new ValidationError("Chart name is required");
+      if (!version) throw new ValidationError("Version is required");
+
+      const artifacts = await this.client.projectRepositoryArtifact.getMany({
+        projectName: projectId,
+        repositoryName: `charts/${chartName}`,
+        query: {},
+      });
+
+      const artifact = (artifacts || []).find((a) =>
+        a.tags?.some((tag) => tag.name === version)
       );
 
       if (!artifact) {
-        throw new Error(
+        throw new ResourceError(
           `Chart version ${version} not found for chart ${chartName}`
         );
       }
 
-      // Delete the artifact using its tag or digest
       await this.client.projectRepositoryArtifact.delete({
         projectName: projectId,
         repositoryName: `charts/${chartName}`,
@@ -209,8 +385,21 @@ export class HarborService {
         success: true,
         message: `Chart ${chartName} version ${version} deleted successfully`,
       };
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to delete chart version");
+    } catch (error: unknown) {
+      throw this.handleError(
+        error,
+        `Failed to delete chart ${chartName} version ${version}`
+      );
     }
+  }
+
+  private handleError(error: unknown, defaultMessage: string): never {
+    if (error instanceof Error) {
+      if (error instanceof ValidationError || error instanceof ResourceError) {
+        throw error;
+      }
+      throw new Error(error.message || defaultMessage);
+    }
+    throw new Error(defaultMessage);
   }
 }

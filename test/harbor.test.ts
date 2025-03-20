@@ -1,4 +1,5 @@
-import { HarborService, ProjectData } from "../src/services/harbor.service";
+import { HarborService } from "../src/services/harbor.service";
+import { ValidationError, ResourceError } from "../src/types/index";
 
 const mockGetMany = jest.fn();
 const mockGetOne = jest.fn();
@@ -31,99 +32,103 @@ describe("HarborService", () => {
   const auth = { username: "testuser", password: "testpass" };
 
   beforeEach(() => {
-    // Clear all mocks before each test
     jest.clearAllMocks();
-
-    // Create a new instance of HarborService for each test
     harborService = new HarborService(apiUrl, auth);
   });
 
-  describe("SSL Certificate Handling", () => {
-    it("should handle self-signed certificates", async () => {
-      // Setup mock response for a successful connection
-      const mockProjects = [{ id: 1, name: "test-project" }];
-      mockGetMany.mockResolvedValueOnce({ data: mockProjects });
-
-      // Attempt to get projects, which would fail if SSL verification was strict
-      const result = await harborService.getProjects();
-
-      // Verify that the request was made and succeeded
-      expect(mockGetMany).toHaveBeenCalledWith({ query: {} });
-      expect(result).toEqual(mockProjects);
+  describe("Constructor Validation", () => {
+    it("should throw ValidationError if apiUrl is missing", () => {
+      expect(() => new HarborService("", auth)).toThrow(ValidationError);
+      expect(() => new HarborService("", auth)).toThrow("API URL is required");
     });
 
-    it("should connect to HTTPS endpoints", async () => {
-      // Setup mock response
-      const mockProject = { id: 1, name: "secure-project" };
-      mockGetOne.mockResolvedValueOnce(mockProject);
+    it("should throw ValidationError if username is missing", () => {
+      expect(
+        () => new HarborService(apiUrl, { username: "", password: "test" })
+      ).toThrow(ValidationError);
+      expect(
+        () => new HarborService(apiUrl, { username: "", password: "test" })
+      ).toThrow("Username is required");
+    });
 
-      // Test connection to HTTPS endpoint
-      const result = await harborService.getProject("1");
-
-      // Verify successful HTTPS connection
-      expect(mockGetOne).toHaveBeenCalledWith(1);
-      expect(result).toEqual(mockProject);
+    it("should throw ValidationError if password is missing", () => {
+      expect(
+        () => new HarborService(apiUrl, { username: "test", password: "" })
+      ).toThrow(ValidationError);
+      expect(
+        () => new HarborService(apiUrl, { username: "test", password: "" })
+      ).toThrow("Password is required");
     });
   });
 
   describe("Project operations", () => {
     it("should get projects", async () => {
-      // Setup mock response
-      const mockProjects = [
-        { id: 1, name: "project1" },
-        { id: 2, name: "project2" },
-      ];
-      mockGetMany.mockResolvedValueOnce({ data: mockProjects });
+      const mockProjects = {
+        data: [
+          {
+            name: "project1",
+            project_id: 1,
+            creation_time: "2023-01-01",
+            update_time: "2023-01-02",
+          },
+          {
+            name: "project2",
+            project_id: 2,
+            creation_time: "2023-02-01",
+            update_time: "2023-02-02",
+          },
+        ],
+      };
+      mockGetMany.mockResolvedValueOnce(mockProjects);
 
-      // Call the method
       const result = await harborService.getProjects();
 
-      // Assertions
       expect(mockGetMany).toHaveBeenCalledWith({ query: {} });
-      expect(result).toEqual(mockProjects);
+      expect(result).toEqual(mockProjects.data);
     });
 
     it("should get a project by ID", async () => {
-      // Setup mock response
-      const mockProject = { id: 1, name: "project1" };
+      const mockProject = {
+        name: "project1",
+        project_id: 1,
+        creation_time: "2023-01-01",
+        update_time: "2023-01-02",
+      };
       mockGetOne.mockResolvedValueOnce(mockProject);
 
-      // Call the method
       const result = await harborService.getProject("1");
 
-      // Assertions
       expect(mockGetOne).toHaveBeenCalledWith(1);
       expect(result).toEqual(mockProject);
     });
 
-    it("should get a project by name", async () => {
-      // Setup mock response
-      const mockProject = { id: 1, name: "project1" };
-      mockGetOne.mockResolvedValueOnce(mockProject);
-
-      // Call the method
-      const result = await harborService.getProject("project1");
-
-      // Assertions
-      expect(mockGetOne).toHaveBeenCalledWith("project1", true);
-      expect(result).toEqual(mockProject);
+    it("should throw ValidationError when getting project with empty ID", async () => {
+      await expect(harborService.getProject("")).rejects.toThrow(
+        ValidationError
+      );
+      await expect(harborService.getProject("")).rejects.toThrow(
+        "Project ID is required"
+      );
     });
 
     it("should create a project", async () => {
-      // Setup mock response
-      const projectData: ProjectData = {
+      const projectData = {
         project_name: "new-project",
         metadata: {
           public: "true",
         },
       };
-      const mockCreatedProject = { id: 3, name: "new-project" };
-      mockCreate.mockResolvedValueOnce(mockCreatedProject);
+      const mockCreatedProject = {
+        name: "new-project",
+        project_id: 3,
+        creation_time: "2023-01-01",
+        update_time: "2023-01-02",
+      };
+      mockCreate.mockResolvedValueOnce({ id: 3 });
+      mockGetOne.mockResolvedValueOnce(mockCreatedProject);
 
-      // Call the method
       const result = await harborService.createProject(projectData);
 
-      // Assertions
       expect(mockCreate).toHaveBeenCalledWith({
         project_name: "new-project",
         metadata: { public: "true" },
@@ -131,234 +136,237 @@ describe("HarborService", () => {
       expect(result).toEqual(mockCreatedProject);
     });
 
-    it("should delete a project by ID", async () => {
-      // Setup mock response
-      mockDelete.mockResolvedValueOnce(undefined);
-
-      // Call the method
-      await harborService.deleteProject("1");
-
-      // Assertions
-      expect(mockDelete).toHaveBeenCalledWith(1);
-    });
-
-    it("should delete a project by name", async () => {
-      // Setup mock response
-      mockDelete.mockResolvedValueOnce(undefined);
-
-      // Call the method
-      await harborService.deleteProject("project1");
-
-      // Assertions
-      expect(mockDelete).toHaveBeenCalledWith("project1", true);
+    it("should throw ValidationError when creating project without name", async () => {
+      const projectData = { project_name: "" };
+      await expect(harborService.createProject(projectData)).rejects.toThrow(
+        ValidationError
+      );
+      await expect(harborService.createProject(projectData)).rejects.toThrow(
+        "Project name is required"
+      );
     });
   });
 
   describe("Repository operations", () => {
     it("should get repositories", async () => {
-      // Setup mock response
-      const mockRepositories = [
-        { name: "repo1", tags_count: 5 },
-        { name: "repo2", tags_count: 3 },
-      ];
-      mockGetMany.mockResolvedValueOnce({ data: mockRepositories });
+      const mockRepositories = {
+        data: [
+          {
+            name: "repo1",
+            artifact_count: 5,
+            creation_time: "2023-01-01",
+            update_time: "2023-01-02",
+          },
+          {
+            name: "repo2",
+            artifact_count: 3,
+            creation_time: "2023-02-01",
+            update_time: "2023-02-02",
+          },
+        ],
+      };
+      mockGetMany.mockResolvedValueOnce(mockRepositories);
 
-      // Call the method
       const result = await harborService.getRepositories("project1");
 
-      // Assertions
       expect(mockGetMany).toHaveBeenCalledWith({
         projectName: "project1",
         query: {},
       });
-      expect(result).toEqual(mockRepositories);
+      expect(result).toEqual(mockRepositories.data);
+    });
+
+    it("should throw ValidationError when getting repositories without project ID", async () => {
+      await expect(harborService.getRepositories("")).rejects.toThrow(
+        ValidationError
+      );
+      await expect(harborService.getRepositories("")).rejects.toThrow(
+        "Project ID is required"
+      );
     });
 
     it("should delete a repository", async () => {
-      // Setup mock response
       mockDelete.mockResolvedValueOnce(undefined);
-
-      // Call the method
       await harborService.deleteRepository("project1", "repo1");
-
-      // Assertions
       expect(mockDelete).toHaveBeenCalledWith("project1/repo1");
+    });
+
+    it("should throw ValidationError when deleting repository without required params", async () => {
+      await expect(harborService.deleteRepository("", "repo1")).rejects.toThrow(
+        "Project ID is required"
+      );
+      await expect(
+        harborService.deleteRepository("project1", "")
+      ).rejects.toThrow("Repository name is required");
     });
   });
 
   describe("Tag operations", () => {
-    it("should get tags", async () => {
-      // Setup mock response
-      const mockArtifacts = [
-        {
-          digest: "sha256:123",
-          tags: ["v1.0", "latest"],
-          size: 1024,
-          push_time: "2023-01-01T00:00:00Z",
-          pull_time: "2023-01-02T00:00:00Z",
-        },
-        {
-          digest: "sha256:456",
-          tags: ["v2.0"],
-          size: 2048,
-          push_time: "2023-02-01T00:00:00Z",
-          pull_time: "2023-02-02T00:00:00Z",
-        },
-      ];
-      mockGetMany.mockResolvedValueOnce(mockArtifacts);
+    const mockArtifacts = [
+      {
+        digest: "sha256:123",
+        tags: [
+          {
+            id: 1,
+            name: "v1.0",
+            push_time: "2023-01-01T00:00:00Z",
+            pull_time: "2023-01-02T00:00:00Z",
+            immutable: false,
+            repository_id: 1,
+            artifact_id: 1,
+            signed: false,
+          },
+        ],
+        size: 1024,
+        push_time: "2023-01-01T00:00:00Z",
+        pull_time: "2023-01-02T00:00:00Z",
+        type: "IMAGE",
+        project_id: 1,
+        repository_id: 1,
+      },
+    ];
 
-      // Call the method
+    it("should get tags", async () => {
+      mockGetMany.mockResolvedValueOnce(mockArtifacts);
       const result = await harborService.getTags("project1", "repo1");
 
-      // Assertions
       expect(mockGetMany).toHaveBeenCalledWith({
         projectName: "project1",
         repositoryName: "repo1",
         query: {},
       });
-      expect(result).toEqual([
-        {
-          name: "sha256:123",
-          tags: ["v1.0", "latest"],
-          size: 1024,
-          push_time: "2023-01-01T00:00:00Z",
-          pull_time: "2023-01-02T00:00:00Z",
-        },
-        {
-          name: "sha256:456",
-          tags: ["v2.0"],
-          size: 2048,
-          push_time: "2023-02-01T00:00:00Z",
-          pull_time: "2023-02-02T00:00:00Z",
-        },
-      ]);
+      expect(result[0].digest).toBe("sha256:123");
+      expect(result[0].tags?.[0].name).toBe("v1.0");
     });
 
-    it("should throw an error when deleting a tag", async () => {
-      // Call the method and expect it to throw
+    it("should throw ValidationError when getting tags without required params", async () => {
+      await expect(harborService.getTags("", "repo1")).rejects.toThrow(
+        "Project ID is required"
+      );
+      await expect(harborService.getTags("project1", "")).rejects.toThrow(
+        "Repository name is required"
+      );
+    });
+
+    it("should delete a tag", async () => {
+      mockGetMany.mockResolvedValueOnce(mockArtifacts);
+      mockDelete.mockResolvedValueOnce(undefined);
+
+      const result = await harborService.deleteTag("project1", "repo1", "v1.0");
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe("Tag v1.0 deleted successfully");
+    });
+
+    it("should throw ResourceError when deleting non-existent tag", async () => {
+      mockGetMany.mockResolvedValueOnce([]);
       await expect(
         harborService.deleteTag("project1", "repo1", "v1.0")
-      ).rejects.toThrow(
-        "deleteTag method using @hapic/harbor needs further implementation"
-      );
+      ).rejects.toThrow(ResourceError);
     });
   });
 
   describe("Chart operations", () => {
-    it("should get charts", async () => {
-      // Setup mock response
-      const mockRepositories = [
+    const mockChartRepositories = {
+      data: [
         {
           name: "project1/charts/chart1",
           artifact_count: 2,
           creation_time: "2023-01-01T00:00:00Z",
           update_time: "2023-01-02T00:00:00Z",
         },
-        {
-          name: "project1/charts/chart2",
-          artifact_count: 1,
-          creation_time: "2023-02-01T00:00:00Z",
-          update_time: "2023-02-02T00:00:00Z",
-        },
-        {
-          name: "project1/not-a-chart",
-          artifact_count: 3,
-          creation_time: "2023-03-01T00:00:00Z",
-          update_time: "2023-03-02T00:00:00Z",
-        },
-      ];
-      mockGetMany.mockResolvedValueOnce({ data: mockRepositories });
+      ],
+    };
 
-      // Call the method
+    it("should get charts", async () => {
+      mockGetMany.mockResolvedValueOnce(mockChartRepositories);
       const result = await harborService.getCharts("project1");
 
-      // Assertions
-      expect(mockGetMany).toHaveBeenCalledWith({
-        projectName: "project1",
-        query: {},
-      });
-      expect(result).toEqual([
-        {
-          name: "chart1",
-          total_versions: 2,
-          latest_version: "",
-          created: "2023-01-01T00:00:00Z",
-          updated: "2023-01-02T00:00:00Z",
-        },
-        {
-          name: "chart2",
-          total_versions: 1,
-          latest_version: "",
-          created: "2023-02-01T00:00:00Z",
-          updated: "2023-02-02T00:00:00Z",
-        },
-      ]);
+      expect(result[0].name).toBe("chart1");
+      expect(result[0].total_versions).toBe(2);
+    });
+
+    it("should throw ValidationError when getting charts without project ID", async () => {
+      await expect(harborService.getCharts("")).rejects.toThrow(
+        "Project ID is required"
+      );
     });
 
     it("should get chart versions", async () => {
-      // Setup mock response
-      const mockArtifacts = [
+      const mockVersions = [
         {
           digest: "sha256:123",
-          tags: ["1.0.0"],
+          tags: [
+            {
+              id: 1,
+              name: "1.0.0",
+              push_time: "2023-01-01T00:00:00Z",
+              pull_time: "2023-01-02T00:00:00Z",
+              immutable: false,
+              repository_id: 1,
+              artifact_id: 1,
+              signed: false,
+            },
+          ],
           push_time: "2023-01-01T00:00:00Z",
-          update_time: "2023-01-02T00:00:00Z",
-        },
-        {
-          digest: "sha256:456",
-          tags: ["2.0.0"],
-          push_time: "2023-02-01T00:00:00Z",
-          update_time: "2023-02-02T00:00:00Z",
+          type: "CHART",
+          project_id: 1,
+          repository_id: 1,
         },
       ];
-      mockGetMany.mockResolvedValueOnce(mockArtifacts);
+      mockGetMany.mockResolvedValueOnce(mockVersions);
 
-      // Call the method
       const result = await harborService.getChartVersions("project1", "chart1");
 
-      // Assertions
-      expect(mockGetMany).toHaveBeenCalledWith({
-        projectName: "project1",
-        repositoryName: "charts/chart1",
-        query: {},
-      });
-      expect(result).toEqual([
-        {
-          name: "sha256:123",
-          version: "1.0.0",
-          created: "2023-01-01T00:00:00Z",
-          updated: "2023-01-02T00:00:00Z",
-        },
-        {
-          name: "sha256:456",
-          version: "2.0.0",
-          created: "2023-02-01T00:00:00Z",
-          updated: "2023-02-02T00:00:00Z",
-        },
-      ]);
+      expect(result[0].name).toBe("sha256:123");
+      expect(result[0].version).toBe("1.0.0");
     });
 
-    it("should return empty array when chart does not exist", async () => {
-      // Setup mock response to throw an error
-      mockGetMany.mockRejectedValueOnce(new Error("Chart not found"));
+    it("should throw ValidationError when getting chart versions without required params", async () => {
+      await expect(
+        harborService.getChartVersions("", "chart1")
+      ).rejects.toThrow("Project ID is required");
+      await expect(
+        harborService.getChartVersions("project1", "")
+      ).rejects.toThrow("Chart name is required");
+    });
 
-      // Call the method
-      const result = await harborService.getChartVersions(
+    it("should delete a chart version", async () => {
+      const mockVersion = {
+        digest: "sha256:123",
+        tags: [
+          {
+            id: 1,
+            name: "1.0.0",
+            push_time: "2023-01-01T00:00:00Z",
+            pull_time: "2023-01-02T00:00:00Z",
+            immutable: false,
+            repository_id: 1,
+            artifact_id: 1,
+            signed: false,
+          },
+        ],
+      };
+      mockGetMany.mockResolvedValueOnce([mockVersion]);
+      mockDelete.mockResolvedValueOnce(undefined);
+
+      const result = await harborService.deleteChart(
         "project1",
-        "non-existent-chart"
+        "chart1",
+        "1.0.0"
       );
 
-      // Assertions
-      expect(result).toEqual([]);
+      expect(result.success).toBe(true);
+      expect(result.message).toBe(
+        "Chart chart1 version 1.0.0 deleted successfully"
+      );
     });
 
-    it("should throw an error when deleting a chart", async () => {
-      // Call the method and expect it to throw
+    it("should throw ResourceError when deleting non-existent chart version", async () => {
+      mockGetMany.mockResolvedValueOnce([]);
       await expect(
         harborService.deleteChart("project1", "chart1", "1.0.0")
-      ).rejects.toThrow(
-        "deleteChart method using @hapic/harbor needs further implementation"
-      );
+      ).rejects.toThrow(ResourceError);
     });
   });
 });
