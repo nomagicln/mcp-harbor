@@ -114,30 +114,3 @@ export interface ProjectData {
   project_name: string;
   metadata?: HarborMetadata;
 }
-
-// Common validation functions
-export const validateRequired = (value: unknown, name: string): void => {
-  if (!value) {
-    throw new ValidationError(`${name} is required`);
-  }
-};
-
-export const validateProjectId = (projectId: unknown): void => {
-  validateRequired(projectId, "projectId");
-};
-
-export const validateRepositoryName = (repositoryName: unknown): void => {
-  validateRequired(repositoryName, "repositoryName");
-};
-
-export const validateChartName = (chartName: unknown): void => {
-  validateRequired(chartName, "chartName");
-};
-
-export const validateTag = (tag: unknown): void => {
-  validateRequired(tag, "tag");
-};
-
-export const validateVersion = (version: unknown): void => {
-  validateRequired(version, "version");
-};

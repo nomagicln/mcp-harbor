@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9.5-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
 
-MCP Harbor is a Node.js application that provides a Model Context Protocol (MCP) server for interacting with Harbor container registry. It also includes a REST API for Harbor operations.
+MCP Harbor is a Node.js application that provides a Model Context Protocol (MCP) server for interacting with Harbor container registry.
 
 ## Table of Contents
 
@@ -13,14 +13,9 @@ MCP Harbor is a Node.js application that provides a Model Context Protocol (MCP)
   - [Features](#features)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Configuration](#configuration)
+  - [Usage](#usage)
+    - [Command Line Arguments](#command-line-arguments)
     - [Environment Variables](#environment-variables)
-    - [Configuration File](#configuration-file)
-  - [API Endpoints](#api-endpoints)
-    - [Projects](#projects)
-    - [Repositories](#repositories)
-    - [Tags](#tags)
-    - [Helm Charts](#helm-charts)
   - [MCP Tools](#mcp-tools)
   - [Development](#development)
     - [Running in Development Mode](#running-in-development-mode)
@@ -36,7 +31,6 @@ MCP Harbor is a Node.js application that provides a Model Context Protocol (MCP)
 ## Features
 
 - **MCP Server**: Exposes tools for interacting with Harbor through the Model Context Protocol
-- **REST API**: Provides RESTful endpoints for Harbor operations
 - **Harbor Operations**: Supports operations for projects, repositories, tags, and Helm charts
 - **TypeScript**: Written in TypeScript for better type safety and developer experience
 - **Automated Tests**: Comprehensive test suite for reliable functionality
@@ -76,69 +70,40 @@ Before installing MCP Harbor, ensure you have:
    npm run build
    ```
 
-5. Start the application:
+## Usage
 
-   ```bash
-   npm start
-   ```
+### Command Line Arguments
 
-## Configuration
+The application accepts the following command line arguments:
+
+```bash
+Options:
+  --url       Harbor API URL                     [string] [required]
+  --username  Harbor username                    [string] [required]
+  --password  Harbor password                    [string] [required]
+  --debug     Enable debug mode          [boolean] [default: false]
+  --help      Show help                                  [boolean]
+```
+
+Example usage:
+
+```bash
+npm start -- --url https://harbor.example.com --username admin --password Harbor12345
+```
 
 ### Environment Variables
 
-Create a `.env` file in the root directory with the following variables:
+Instead of command line arguments, you can also use environment variables. Create a `.env` file in the root directory:
 
 ```env
-# Required
-HARBOR_URL=https://your-harbor-instance.com
-HARBOR_USERNAME=your_username
-HARBOR_PASSWORD=your_password
+# Harbor API Configuration
+HARBOR_URL=https://harbor.example.com
+HARBOR_USERNAME=admin
+HARBOR_PASSWORD=Harbor12345
 
-# Optional
-PORT=3000                  # Server port (default: 3000)
-LOG_LEVEL=info            # Logging level (default: info)
-ENABLE_HTTPS=false       # Enable HTTPS (default: false)
-SSL_CERT_PATH=/path/to/cert.pem  # Required if ENABLE_HTTPS=true
-SSL_KEY_PATH=/path/to/key.pem    # Required if ENABLE_HTTPS=true
+# Debug Mode (true/false)
+DEBUG=false
 ```
-
-### Configuration File
-
-Additional configuration options can be set in `src/config/harbor.config.ts`:
-
-```typescript
-{
-  timeout: 30000,         // API request timeout in milliseconds
-  retryAttempts: 3,      // Number of retry attempts for failed requests
-  cacheEnabled: true,     // Enable response caching
-  cacheTTL: 300          // Cache TTL in seconds
-}
-```
-
-## API Endpoints
-
-### Projects
-
-- `GET /projects` - List all projects
-- `GET /projects/:id` - Get project details
-- `POST /projects` - Create a new project
-- `DELETE /projects/:id` - Delete a project
-
-### Repositories
-
-- `GET /projects/:projectId/repositories` - List repositories in a project
-- `DELETE /projects/:projectId/repositories/:repositoryName` - Delete a repository
-
-### Tags
-
-- `GET /projects/:projectId/repositories/:repositoryName/tags` - List tags in a repository
-- `DELETE /projects/:projectId/repositories/:repositoryName/tags/:tag` - Delete a tag
-
-### Helm Charts
-
-- `GET /projects/:projectId/charts` - List Helm charts in a project
-- `GET /projects/:projectId/charts/:chartName/versions` - List versions of a Helm chart
-- `DELETE /projects/:projectId/charts/:chartName/versions/:version` - Delete a Helm chart version
 
 ## MCP Tools
 
@@ -147,16 +112,16 @@ The MCP server exposes the following tools:
 | Tool Name | Description | Parameters |
 |-----------|-------------|------------|
 | `list_projects` | List all projects in Harbor | None |
-| `get_project` | Get project details by ID | `id: number` |
-| `create_project` | Create a new project | `name: string, public?: boolean` |
-| `delete_project` | Delete a project | `id: number` |
-| `list_repositories` | List repositories in a project | `projectId: number` |
-| `delete_repository` | Delete a repository | `projectId: number, repoName: string` |
-| `list_tags` | List tags in a repository | `projectId: number, repoName: string` |
-| `delete_tag` | Delete a tag | `projectId: number, repoName: string, tag: string` |
-| `list_charts` | List Helm charts | `projectId: number` |
-| `list_chart_versions` | List chart versions | `projectId: number, chartName: string` |
-| `delete_chart` | Delete chart version | `projectId: number, chartName: string, version: string` |
+| `get_project` | Get project details by ID | `projectId: string` |
+| `create_project` | Create a new project | `project_name: string, metadata?: object` |
+| `delete_project` | Delete a project | `projectId: string` |
+| `list_repositories` | List repositories in a project | `projectId: string` |
+| `delete_repository` | Delete a repository | `projectId: string, repositoryName: string` |
+| `list_tags` | List tags in a repository | `projectId: string, repositoryName: string` |
+| `delete_tag` | Delete a tag | `projectId: string, repositoryName: string, tag: string` |
+| `list_charts` | List Helm charts | `projectId: string` |
+| `list_chart_versions` | List chart versions | `projectId: string, chartName: string` |
+| `delete_chart` | Delete chart version | `projectId: string, chartName: string, version: string` |
 
 ## Development
 
@@ -197,16 +162,14 @@ npm run debug:server
 mcp-harbor
 ├── src
 │   ├── app.ts                 # Main application entry point (MCP server)
-│   ├── config
-│   │   └── harbor.config.ts   # Harbor configuration
 │   ├── controllers
-│   │   └── harbor.controller.ts # REST API controllers
+│   │   └── harbor.controller.ts # Harbor controllers
 │   ├── services
 │   │   └── harbor.service.ts  # Harbor service implementation
 │   ├── models 
 │   │   └── harbor.model.ts    # Data models
 │   ├── routes
-│   │   └── harbor.routes.ts   # API route definitions
+│   │   └── harbor.routes.ts   # Route definitions
 │   └── types
 │       └── index.ts           # TypeScript type definitions
 ├── test
@@ -227,39 +190,39 @@ mcp-harbor
 
 1. **Connection Failed**
 
-   ```
-   Error: Unable to connect to Harbor instance
-   ```
+    ```
+    Error: Unable to connect to Harbor instance
+    ```
 
-   - Verify HARBOR_URL is correct and accessible
-   - Check network connectivity
-   - Ensure Harbor instance is running
+    - Verify HARBOR_URL is correct and accessible
+    - Check network connectivity
+    - Ensure Harbor instance is running
 
 2. **Authentication Failed**
 
-   ```
-   Error: Invalid credentials
-   ```
+    ```
+    Error: Invalid credentials
+    ```
 
-   - Verify HARBOR_USERNAME and HARBOR_PASSWORD are correct
-   - Check if user has required permissions
+    - Verify HARBOR_USERNAME and HARBOR_PASSWORD are correct
+    - Check if user has required permissions
 
 3. **Build Errors**
 
-   ```
-   Error: TypeScript compilation failed
-   ```
+    ```
+    Error: TypeScript compilation failed
+    ```
 
-   - Run `npm install` to ensure all dependencies are installed
-   - Check TypeScript version compatibility
-   - Clear the `dist` directory and rebuild
+    - Run `npm install` to ensure all dependencies are installed
+    - Check TypeScript version compatibility
+    - Clear the `dist` directory and rebuild
 
 ### Debug Mode
 
-Enable debug logging by setting:
+Enable debug mode by using the `--debug` flag or setting:
 
 ```env
-LOG_LEVEL=debug
+DEBUG=true
 ```
 
 ### Support
@@ -268,7 +231,7 @@ For additional help:
 
 1. Check the [DEBUG.md](DEBUG.md) file
 2. Run the connection test: `npm run test:connection`
-3. Review the application logs in `logs/` directory
+3. Review the application logs
 
 ## License
 

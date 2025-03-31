@@ -1,4 +1,5 @@
 import { HarborClient } from "@hapic/harbor";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import {
   HarborArtifact,
   HarborArtifactTag,
@@ -9,6 +10,8 @@ import {
   ResourceError,
   ValidationError,
   DeleteResponse,
+  TOOL_NAMES,
+  HarborMetadata,
 } from "../types/index.js";
 
 // Internal type definitions to match Harbor API types
@@ -378,5 +381,178 @@ export class HarborService {
       throw new Error(error.message || defaultMessage);
     }
     throw new Error(defaultMessage);
+  }
+
+  async handleToolRequest(
+    toolName: string,
+    args: Record<string, unknown>
+  ): Promise<{ content: { type: string; text: string }[] }> {
+    const validateParam = (param: unknown, name: string): string => {
+      if (!param) {
+        throw new McpError(ErrorCode.InvalidParams, `${name} is required`);
+      }
+      return param as string;
+    };
+
+    switch (toolName) {
+      case TOOL_NAMES.LIST_PROJECTS:
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(await this.getProjects(), null, 2),
+            },
+          ],
+        };
+
+      case TOOL_NAMES.GET_PROJECT: {
+        const projectId = validateParam(args.projectId, "projectId");
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(await this.getProject(projectId), null, 2),
+            },
+          ],
+        };
+      }
+
+      case TOOL_NAMES.CREATE_PROJECT: {
+        const project_name = validateParam(args.project_name, "project_name");
+        const metadata = args.metadata as HarborMetadata | undefined;
+
+        const projectData: ProjectData = {
+          project_name,
+          ...(metadata && { metadata }),
+        };
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                await this.createProject(projectData),
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case TOOL_NAMES.DELETE_PROJECT: {
+        const projectId = validateParam(args.projectId, "projectId");
+        await this.deleteProject(projectId);
+        return {
+          content: [{ type: "text", text: "Project deleted successfully" }],
+        };
+      }
+
+      case TOOL_NAMES.LIST_REPOSITORIES: {
+        const projectId = validateParam(args.projectId, "projectId");
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                await this.getRepositories(projectId),
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case TOOL_NAMES.DELETE_REPOSITORY: {
+        const projectId = validateParam(args.projectId, "projectId");
+        const repositoryName = validateParam(
+          args.repositoryName,
+          "repositoryName"
+        );
+        await this.deleteRepository(projectId, repositoryName);
+        return {
+          content: [{ type: "text", text: "Repository deleted successfully" }],
+        };
+      }
+
+      case TOOL_NAMES.LIST_TAGS: {
+        const projectId = validateParam(args.projectId, "projectId");
+        const repositoryName = validateParam(
+          args.repositoryName,
+          "repositoryName"
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                await this.getTags(projectId, repositoryName),
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case TOOL_NAMES.DELETE_TAG: {
+        const projectId = validateParam(args.projectId, "projectId");
+        const repositoryName = validateParam(
+          args.repositoryName,
+          "repositoryName"
+        );
+        const tag = validateParam(args.tag, "tag");
+        await this.deleteTag(projectId, repositoryName, tag);
+        return {
+          content: [{ type: "text", text: "Tag deleted successfully" }],
+        };
+      }
+
+      case TOOL_NAMES.LIST_CHARTS: {
+        const projectId = validateParam(args.projectId, "projectId");
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(await this.getCharts(projectId), null, 2),
+            },
+          ],
+        };
+      }
+
+      case TOOL_NAMES.LIST_CHART_VERSIONS: {
+        const projectId = validateParam(args.projectId, "projectId");
+        const chartName = validateParam(args.chartName, "chartName");
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                await this.getChartVersions(projectId, chartName),
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case TOOL_NAMES.DELETE_CHART: {
+        const projectId = validateParam(args.projectId, "projectId");
+        const chartName = validateParam(args.chartName, "chartName");
+        const version = validateParam(args.version, "version");
+        await this.deleteChart(projectId, chartName, version);
+        return {
+          content: [{ type: "text", text: "Chart deleted successfully" }],
+        };
+      }
+
+      default:
+        throw new McpError(
+          ErrorCode.MethodNotFound,
+          `Unknown tool: ${toolName}`
+        );
+    }
   }
 }
