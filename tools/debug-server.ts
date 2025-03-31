@@ -33,7 +33,7 @@ const env = {
 /**
  * Run the MCP server with enhanced debugging
  */
-function runDebugServer() {
+function runDebugServer(): void {
   console.log("MCP Harbor Debug Server");
   console.log("======================");
   console.log("");

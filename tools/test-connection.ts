@@ -35,7 +35,7 @@ const env = {
 /**
  * Test connection using STDIO transport
  */
-async function testStdioConnection() {
+async function testStdioConnection(): Promise<boolean> {
   console.log("Testing STDIO connection...");
 
   try {
@@ -99,7 +99,7 @@ async function testStdioConnection() {
 /**
  * Main function
  */
-async function main() {
+async function main(): Promise<void> {
   console.log("MCP Harbor Connection Tester");
   console.log("============================");
   console.log("");

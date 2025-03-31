@@ -192,7 +192,7 @@ class HarborMcpServer {
   }
 
   private setupErrorHandler(): void {
-    this.server.onerror = (error: Error) => {
+    this.server.onerror = (error: Error): void => {
       console.error("[MCP Error]", error);
       console.error("[MCP Error Stack]", error.stack);
 
@@ -231,8 +231,8 @@ class HarborMcpServer {
   private async handleToolRequest(
     toolName: string,
     args: Record<string, unknown>
-  ) {
-    const validateParam = (param: unknown, name: string) => {
+  ): Promise<{ content: { type: string; text: string }[] }> {
+    const validateParam = (param: unknown, name: string): string => {
       if (!param) {
         throw new McpError(ErrorCode.InvalidParams, `${name} is required`);
       }

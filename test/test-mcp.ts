@@ -30,7 +30,7 @@ const env = {
 };
 
 // Function to run the MCP server and capture its output
-function runMcpServer() {
+function runMcpServer(): import("child_process").ChildProcess {
   console.log("Starting MCP Harbor server in debug mode...");
 
   // Verify required environment variables

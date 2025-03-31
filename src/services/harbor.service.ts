@@ -34,29 +34,6 @@ interface Repository extends BaseResource {
   artifact_count?: number;
 }
 
-interface ArtifactTag {
-  id: number;
-  name: string;
-  push_time: string;
-  pull_time: string;
-  immutable: boolean;
-  repository_id: number;
-  artifact_id: number;
-  signed: boolean;
-}
-
-interface Artifact {
-  digest: string;
-  tags?: ArtifactTag[];
-  size: number;
-  push_time: string;
-  pull_time: string;
-  type: string;
-  project_id: number;
-  repository_id: number;
-  id?: number;
-}
-
 interface ResourceCollection<T> {
   data: T[];
   meta?: {
