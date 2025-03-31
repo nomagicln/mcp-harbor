@@ -5,7 +5,7 @@ name: Node.js Package
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   build:
@@ -16,18 +16,24 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      - run: npm run build
       - run: npm test
+      - run: npm run lint
 
-  publish-npm:
+  publish:
     needs: build
     runs-on: ubuntu-latest
+    environment: release
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
           registry-url: https://registry.npmjs.org/
+
       - run: npm ci
       - run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{secrets.npm_token}}
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
