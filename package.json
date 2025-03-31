@@ -12,8 +12,8 @@
     "README.md"
   ],
   "scripts": {
-    "dev": "node dist/app.js --sse",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "build": "tsc && cp package.json dist/ && chmod +x dist/app.js",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix"

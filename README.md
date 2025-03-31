@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9.5-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
+[![codecov](https://codecov.io/gh/nomagicln/mcp-harbor/graph/badge.svg?token=TZ95P20K6P)](https://codecov.io/gh/nomagicln/mcp-harbor)
 
 MCP Harbor is a Node.js application that provides a Model Context Protocol (MCP) server for interacting with Harbor container registry.
 
@@ -20,7 +21,6 @@ MCP Harbor is a Node.js application that provides a Model Context Protocol (MCP)
   - [Development](#development)
     - [Running in Development Mode](#running-in-development-mode)
     - [Running Tests](#running-tests)
-    - [Debug Tools](#debug-tools)
   - [Project Structure](#project-structure)
   - [Troubleshooting](#troubleshooting)
     - [Common Issues](#common-issues)
@@ -85,12 +85,6 @@ Options:
   --help      Show help                                  [boolean]
 ```
 
-Example usage:
-
-```bash
-npm start -- --url https://harbor.example.com --username admin --password Harbor12345
-```
-
 ### Environment Variables
 
 Instead of command line arguments, you can also use environment variables. Create a `.env` file in the root directory:
@@ -139,21 +133,6 @@ npm test
 
 # Run tests with coverage
 npm run test:coverage
-
-# Run specific test file
-npm test -- test/harbor.test.ts
-```
-
-### Debug Tools
-
-The project includes debug tools in the `tools` directory:
-
-```bash
-# Test Harbor connection
-npm run test:connection
-
-# Start debug server
-npm run debug:server
 ```
 
 ## Project Structure
@@ -162,25 +141,22 @@ npm run debug:server
 mcp-harbor
 ├── src
 │   ├── app.ts                 # Main application entry point (MCP server)
-│   ├── controllers
-│   │   └── harbor.controller.ts # Harbor controllers
+│   ├── definitions
+│   │   └── tool.definitions.ts # Tool definitions for MCP
 │   ├── services
 │   │   └── harbor.service.ts  # Harbor service implementation
-│   ├── models 
-│   │   └── harbor.model.ts    # Data models
-│   ├── routes
-│   │   └── harbor.routes.ts   # Route definitions
 │   └── types
 │       └── index.ts           # TypeScript type definitions
 ├── test
 │   └── harbor.test.ts         # Tests for Harbor service
-├── tools
-│   ├── debug-server.ts        # Debug server implementation
-│   └── test-connection.ts     # Connection testing utility
 ├── .env.example              # Example environment variables
 ├── .gitignore               # Git ignore file
+├── .eslintrc.json           # ESLint configuration
 ├── package.json            # Project dependencies
+├── jest.config.js           # Jest configuration
+├── tsconfig.test.json      # TypeScript configuration for tests
 ├── tsconfig.json          # TypeScript configuration
+├── LICENSE                # Project license
 └── README.md             # Project documentation
 ```
 
@@ -229,9 +205,7 @@ DEBUG=true
 
 For additional help:
 
-1. Check the [DEBUG.md](DEBUG.md) file
-2. Run the connection test: `npm run test:connection`
-3. Review the application logs
+1. Review the application logs
 
 ## License
 
