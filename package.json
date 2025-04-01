@@ -1,8 +1,7 @@
 {
   "name": "mcp-harbor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Node.js application for connecting to Harbor and providing operations capabilities.",
-  "main": "dist/app.js",
   "type": "module",
   "bin": {
     "mcp-harbor": "./dist/app.js"
